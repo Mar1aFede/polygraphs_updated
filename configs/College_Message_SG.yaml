@@ -1,0 +1,20 @@
+# Kind and size of network (a complete network with 10 agents)
+network.kind: "gml"
+network.gml.name: "Message_GMLNetwork"
+network.gml.path: "/Users/mariafedericanorelli/Desktop/humannetworkscience/graphs/College_Message_SG.gml"
+network.gml.directed: True
+
+# Initial beliefs are random uniform between 0 and 1
+init.kind: "uniform"
+# Chance that action B is better than action A
+epsilon: 0.01
+# Enable logging; print progress every 100 steps
+logging.enabled: True
+logging.interval: 100
+# Enable snapshots; take one every 100 steps
+snapshots.enabled: True
+snapshots.interval: 100
+# Run for 1,000 steps
+simulation.steps: 1000
+# Set model
+op: "BalaGoyalOp"

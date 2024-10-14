@@ -1,0 +1,49 @@
+
+op: "AdaptivePolyGraphOp"
+
+adaptive: true
+
+network:
+  kind: random
+  type: erdos_renyi
+  size: 50
+  random:
+    probability: 0.1
+    tries: 10
+    seed: 42
+  directed: false
+  selfloop: false
+
+simulation:
+  steps: 5000
+  repeats: 1
+  adaptive: true
+
+device: cpu
+init:
+  type: gaussian
+  mean: 1.0
+  std: 0.2
+
+belief_update_rule: sigma_AD
+alpha: 3
+K: 3
+dt: 0.01
+
+adaptation_rule: homophily_based_AD
+adaptation_params:
+  gamma: 0
+  m: 10
+
+# Activities section added here
+# activities:
+  # type: gaussian  # Options: gaussian, exponential, powerlaw
+  # params:
+  #   mean: 0
+  #   std: 2
+
+activities:
+  type: powerlaw  # Options: gaussian, exponential, powerlaw
+  params:
+    powerlaw_alpha: 2.1
+

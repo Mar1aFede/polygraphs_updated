@@ -272,7 +272,8 @@ def simulate(params, op=None, **meta):
         # Create the graph and convert it to DGL directly
         
         graph = graphs.create(params.network)
-        
+       
+              
         # Check the edge attributes directly
         if not hasattr(graph, 'edata') or 'timestamp' not in graph.edata:
             raise ValueError("No timestamp edge attribute found in the DGL graph.")
@@ -281,6 +282,7 @@ def simulate(params, op=None, **meta):
         # Now call the create_subgraphs function
         subgraphs = create_subgraphs(graph, interval)
         print(f"Number of subgraphs created: {len(subgraphs)}")  # Debugging print
+        
         if len(subgraphs) == 0:
             raise ValueError("No subgraphs created.")
         steps_per_subgraph = calculate_steps_per_subgraph(len(subgraphs), params.simulation.steps)
@@ -289,24 +291,31 @@ def simulate(params, op=None, **meta):
         
         
         # Run simulation on each subgraph
-        for i, (interval_label, subgraph) in enumerate(subgraphs):
-            print(f"Running simulation {i+1}/{len(subgraphs)} for interval: {interval_label}, Steps: {steps_per_subgraph}")
-            print(f"Subgraph for interval {interval_label} has {subgraph.number_of_edges()} edges and {subgraph.number_of_nodes()} nodes.")
+        for idx in range(params.simulation.repeats):
+            log.debug("Simulation #{:04d} starts".format(idx + 1))
+            for i, (interval_label, subgraph) in enumerate(subgraphs):
+                print(f"Running simulation {i + 1}/{len(subgraphs)} for interval: {interval_label}, Repetition: {idx + 1}, Steps: {steps_per_subgraph}")
+                print(f"Subgraph for interval {interval_label} has {subgraph.number_of_edges()} edges and {subgraph.number_of_nodes()} nodes.")
+
+                # Move the subgraph to the device (e.g., CPU/GPU)
+                subgraph = subgraph.to(device=params.device)
             
-            # Move the subgraph to the device (e.g., CPU/GPU)
-            subgraph = subgraph.to(device=params.device)
+                #Transfer the node states (beliefs) to the subgraph
+                transfer_node_states(subgraph, node_states)
+                print(f"Beliefs before simulation {id(subgraph)}: {subgraph.ndata['beliefs']}")
             
-            #Transfer the node states (beliefs) to the subgraph
-            transfer_node_states(subgraph, node_states)
-            print(f"Beliefs before simulation {id(subgraph)}: {subgraph.ndata['beliefs']}")
-            
-           # Run the simulation
-            model = op(subgraph, params)
-            run_simulation_on_subgraph(subgraph, model, steps_per_subgraph, params, meta, interval_label, results)
-            
-            # Save node states 
-            node_states = store_node_states(subgraph)
-            print(f'Updated node states after simulation: {node_states}')
+            #     Run the simulation
+                model = op(subgraph, params)
+                # Export graph (beliefs are initialised)
+                prefix = f"{(idx + 1):0{len(str(params.simulation.repeats))}d}_{interval_label}"  # Unique prefix
+                _storegraph(params, subgraph, prefix)
+                result = run_simulation_on_subgraph(subgraph, model, steps_per_subgraph, params, meta, interval_label, results)
+                # Ensure results are ready for the next simulation
+                results = metadata.PolyGraphSimulation(uid=uuid.uuid4().hex, **meta)
+
+                # Save node states 
+                node_states = store_node_states(subgraph)
+                print(f'Updated node states after simulation: {node_states}')
             
             # # Store final beliefs for this interval into the belief matrix
             # final_beliefs = subgraph.ndata['beliefs'].cpu().numpy()  # Get beliefs as numpy array
@@ -319,10 +328,13 @@ def simulate(params, op=None, **meta):
         for idx in range(params.simulation.repeats):
             log.debug("Simulation #{:04d} starts".format(idx + 1))
             graph = graphs.create(params.network)
+          
             graph = graph.to(device=params.device)
             model = op(graph, params)
             prefix = f"{(idx + 1):0{len(str(params.simulation.repeats))}d}"
             _storegraph(params, graph, prefix)
+           
+            
             model.eval()
             hooks = []
             if params.logging.enabled:
@@ -356,19 +368,13 @@ def simulate(params, op=None, **meta):
                 "polarized: {:<1} ".format(idx + 1, *result)
             )
     _storeresult(params, results)
-    
-    #belief_matrix = np.array(belief_matrix).T  # Transpose to get nodes in rows, intervals in columns
-
-    # # Print belief matrix
-    # print("Belief matrix of nodes over time intervals:")
-    # print(belief_matrix)
-    
-    # return results
+    return results
 
 def run_simulation_on_subgraph(graph, model, steps, params, meta, interval_label, results):
     """
     Runs the simulation on a specific subgraph for a given number of steps.
     """
+   
     model.eval()
     hooks = []
 
@@ -401,19 +407,23 @@ def run_simulation_on_subgraph(graph, model, steps, params, meta, interval_label
         hooks=hooks  # Hooks will be executed inside `simulate_`, no need to call them manually
     )
     
-    # Store the result
-    results.add(*result)
-    
-    # Log the result for this subgraph
+    # Unpack the results for clarity
+    steps_taken, duration, action, undefined, converged, polarized = result
+       
+     # Store the result
+    results.add(steps_taken, duration, action, undefined, converged, polarized)
+       
     log.info(
-        f"Interval {interval_label}: "
-        f"{steps} steps "
-        f"{result[1]:7.2f}s; "
-        f"action: {result[2]:1s} "
-        f"undefined: {result[3]} "
-        f"converged: {result[4]} "
-        f"polarized: {result[5]}"
-    )
+           f"Interval {interval_label}: "
+           f"{steps} steps "
+           f"{duration:7.2f}s; "
+           f"action: {action} "
+           f"undefined: {undefined} "
+           f"converged: {converged} "
+           f"polarized: {polarized}"
+       )
+
+    return results
 
 def simulate_(
     graph, model, steps=1, hooks=None, mistrust=0.0, lowerupper=0.5, upperlower=0.99

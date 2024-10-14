@@ -75,6 +75,7 @@ class SimulationProcessor:
         # Initialize a list to store paths of subfolders representing individual simulations
         # Include the root folder as one of the folder to search for simulations
         folders = []
+    
         if isinstance(path, list):
             _folders = []
             for _path in path:
@@ -95,22 +96,28 @@ class SimulationProcessor:
 
         # Process each subfolder and concatenate the results into the result DataFrame
         for folder in folders:
-            try:
-                subfolder_df = self.process_subfolder(folder)
+           try:
+               subfolder_df = self.process_subfolder(folder)
                 # Add folder if we get a dataframe with simulations
-                if isinstance(subfolder_df, pd.DataFrame):
+               if isinstance(subfolder_df, pd.DataFrame):
                     result_df = pd.concat(
                         [result_df, subfolder_df.dropna(axis=1, how="all")],
                         ignore_index=True,
                     )
-            except (FileNotFoundError, PermissionError) as e:
+                 
+           except (FileNotFoundError, PermissionError) as e:
                 # Handle exceptions if there are issues accessing folders
                 warnings.warn(f"Error accessing folder: {e}", RuntimeWarning)
+             
 
         # Store the aggregated DataFrame in the class attribute `self.dataframe`
+      
         self.dataframe = result_df
+        
+        return 
 
     def process_subfolder(self, subfolder_path):
+        
         """
         Process each subfolder in the root folder.
 
@@ -124,11 +131,12 @@ class SimulationProcessor:
 
         # Resolve path to config file using pathlib
         config_path = subfolder_path / "configuration.json"
-
+        print(f"Checking for config file at: {config_path}")  
         # If no configuration file is found, skip processing this subfolder
         if not config_path.exists():
-            return
-
+           print(f"No configuration file found at {config_path}.")
+           return 
+       
         # Load the configuration JSON file
         config_data = self.load_config(config_path)
 
@@ -157,7 +165,8 @@ class SimulationProcessor:
 
         # If no HDF5 files are found, skip processing this subfolder
         if len(_hd5_files) == 0:
-            return
+           print(f"No HDF5 files found in {subfolder_path}.")  # Collect message
+            
 
         # Initialize lists to store paths to binary and HDF5 files
         hd5_files = []
@@ -168,6 +177,11 @@ class SimulationProcessor:
             if _bin_file.exists():
                 hd5_files.append(str(sim))
                 bin_files.append(str(_bin_file))
+                
+        # If no matching bin files are found, skip processing
+        if len(hd5_files) == 0 or len(bin_files) == 0:
+            print(f"No matching .bin files found for .hd5 files in {subfolder_path}.")
+            return
 
         # Initialize an empty DataFrame to store processed data
         df = pd.DataFrame()
@@ -212,7 +226,6 @@ class SimulationProcessor:
 
         # Store config in self.configs if we didnt skip directory
         self.configs[config_path] = config_data
-
         # Return the processed DataFrame
         return df
 

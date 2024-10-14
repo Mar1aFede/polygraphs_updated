@@ -17,6 +17,7 @@ class GraphConverter:
     def get_networkx_object(self, filepath):
         # Get a networkx Graph object from the specified filepath
         return self.convert_graph_networkx(self.get_graph_object(filepath))
+    
 
 
 class Graphs:

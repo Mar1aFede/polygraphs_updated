@@ -6,6 +6,11 @@ class BeliefProcessor:
     def get_beliefs(self, hd5_file_path, bin_file_path, graph_converter):
         # Retrieve graph object from bin file using the provided graph_converter
         graph = graph_converter.get_graph_object(bin_file_path)
+	  # Check if the graph is empty or if it contains the necessary attributes
+        if graph is None or graph.number_of_nodes() == 0:
+            print(f"[ERROR] No nodes in graph from {bin_file_path}.")
+            return pd.DataFrame()  # Return an empty DataFrame if the graph is not valid
+        
         # Convert the graph to a NetworkX graph
         G = graph_converter.convert_graph_networkx(graph)
 

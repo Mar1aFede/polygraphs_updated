@@ -242,7 +242,7 @@ def print_node_states(graph, step_description):
 @torch.no_grad()
 def simulate(params, op=None, **meta):
     """
-    Runs a PolyGraph simulation multiple times.
+    Runs a PolyGraph simulation multiple times for both static and temporal networks.
     """
     assert isinstance(params, hparams.PolyGraphHyperParameters)
     
@@ -261,61 +261,70 @@ def simulate(params, op=None, **meta):
     uid, params.simulation.results = _mkdir(params.simulation.results)
     _storeparams(params)
     results = metadata.PolyGraphSimulation(uid=uid, **meta)
-    
-    # # Initialize belief matrix
-    # belief_matrix = []
-
 
     # Check if the network is temporal
     interval = getattr(params, 'interval', None) if hasattr(params, 'interval') else None
     adaptive = getattr(params, 'adaptive', False) if hasattr(params, 'adaptive') else False
     if interval:
-        # Create the graph and convert it to DGL directly
-        
+        # Temporal graph (subgraph case)
         graph = graphs.create(params.network)
-       
-              
+        
         # Check the edge attributes directly
         if not hasattr(graph, 'edata') or 'timestamp' not in graph.edata:
             raise ValueError("No timestamp edge attribute found in the DGL graph.")
         
-
-        # Now call the create_subgraphs function
+        # Create subgraphs
         subgraphs = create_subgraphs(graph, interval)
         print(f"Number of subgraphs created: {len(subgraphs)}")  # Debugging print
         
         if len(subgraphs) == 0:
             raise ValueError("No subgraphs created.")
+
         steps_per_subgraph = calculate_steps_per_subgraph(len(subgraphs), params.simulation.steps)
+        
         # Initialize beliefs for the graph before creating subgraphs
         node_states = initialize_beliefs(graph, params)
         
-        
-        # Run simulation on each subgraph
+        # Temporal graph (subgraph) case
         for idx in range(params.simulation.repeats):
             log.debug("Simulation #{:04d} starts".format(idx + 1))
             for i, (interval_label, subgraph) in enumerate(subgraphs):
-                print(f"Running simulation {i + 1}/{len(subgraphs)} for interval: {interval_label}, Repetition: {idx + 1}, Steps: {steps_per_subgraph}")
-                print(f"Subgraph for interval {interval_label} has {subgraph.number_of_edges()} edges and {subgraph.number_of_nodes()} nodes.")
-
+                print(f"Running simulation {i + 1}/{len(subgraphs)} for interval: {interval_label}, Repetition: {idx + 1}")
+        
                 # Move the subgraph to the device (e.g., CPU/GPU)
                 subgraph = subgraph.to(device=params.device)
-            
-                #Transfer the node states (beliefs) to the subgraph
+        
+                # Transfer the node states (beliefs) to the subgraph
                 transfer_node_states(subgraph, node_states)
-                print(f"Beliefs before simulation {id(subgraph)}: {subgraph.ndata['beliefs']}")
-            
-            #     Run the simulation
+        
+                # Run the simulation on the subgraph
                 model = op(subgraph, params)
-                # Export graph (beliefs are initialised)
-                prefix = f"{(idx + 1):0{len(str(params.simulation.repeats))}d}_{interval_label}"  # Unique prefix
+                hooks = create_hooks(params, interval_label)
+        
+                result = simulate_(
+                    subgraph,
+                    model,
+                    steps=steps_per_subgraph,
+                    mistrust=params.mistrust,
+                    lowerupper=params.lowerupper,
+                    upperlower=params.upperlower,
+                    hooks=hooks,
+                )
+        
+                # Create a unique prefix for each subgraph
+                prefix = f"{interval_label}"
+                print(f"Storing subgraph with prefix: {prefix}")
+        
+                # Store the updated subgraph after running the simulation
                 _storegraph(params, subgraph, prefix)
-                result = run_simulation_on_subgraph(subgraph, model, steps_per_subgraph, params, meta, interval_label, results)
-                # Ensure results are ready for the next simulation
-                results = metadata.PolyGraphSimulation(uid=uuid.uuid4().hex, **meta)
-
-                # Save node states 
+        
+                # Add results to the results object
+                results.add(*result)
+                log_result(idx + 1, interval_label, steps_per_subgraph, result)
+        
+                # Save node states for the next iteration
                 node_states = store_node_states(subgraph)
+
                 print(f'Updated node states after simulation: {node_states}')
             
             # # Store final beliefs for this interval into the belief matrix
@@ -344,29 +353,14 @@ def simulate(params, op=None, **meta):
                
     else: 
         # Standard execution for static networks
+
         for idx in range(params.simulation.repeats):
             log.debug("Simulation #{:04d} starts".format(idx + 1))
             graph = graphs.create(params.network)
-          
             graph = graph.to(device=params.device)
             model = op(graph, params)
-            prefix = f"{(idx + 1):0{len(str(params.simulation.repeats))}d}"
-            _storegraph(params, graph, prefix)
-           
-            
-            model.eval()
-            hooks = []
-            if params.logging.enabled:
-                hooks += [monitors.MonitorHook(interval=params.logging.interval)]
-            if params.snapshots.enabled:
-                hooks += [
-                    monitors.SnapshotHook(
-                        interval=params.snapshots.interval,
-                        messages=params.snapshots.messages,
-                        location=params.simulation.results,
-                        filename=f"{prefix}.hd5",
-                    )
-                ]
+            hooks = create_hooks(params, f"{(idx + 1):0{len(str(params.simulation.repeats))}d}")
+
             result = simulate_(
                 graph,
                 model,
@@ -376,28 +370,21 @@ def simulate(params, op=None, **meta):
                 upperlower=params.upperlower,
                 hooks=hooks,
             )
+            # Store the updated graph after running the simulation
+            prefix = f"{(idx + 1):0{len(str(params.simulation.repeats))}d}"
+            _storegraph(params, graph, prefix)
             results.add(*result)
-            log.info(
-                "Sim #{:04d}: "
-                "{:6d} steps "
-                "{:7.2f}s; "
-                "action: {:1s} "
-                "undefined: {:<1} "
-                "converged: {:<1} "
-                "polarized: {:<1} ".format(idx + 1, *result)
-            )
+            log_result(idx + 1, "", params.simulation.steps, result)
+
+    # Store final results
     _storeresult(params, results)
     return results
 
-def run_simulation_on_subgraph(graph, model, steps, params, meta, interval_label, results):
+def create_hooks(params, label):
     """
-    Runs the simulation on a specific subgraph for a given number of steps.
+    Create MonitorHook and SnapshotHook for the given label.
     """
-   
-    model.eval()
     hooks = []
-
-    # Add MonitorHook and SnapshotHook to the list of hooks
     if params.logging.enabled:
         hooks += [monitors.MonitorHook(interval=params.logging.interval)]
     if params.snapshots.enabled:
@@ -406,43 +393,26 @@ def run_simulation_on_subgraph(graph, model, steps, params, meta, interval_label
                 interval=params.snapshots.interval,
                 messages=params.snapshots.messages,
                 location=params.simulation.results,
-                filename=f"{interval_label}.hd5",
+                filename=f"{label}.hd5",
             )
         ]
-    
-    # Set `_last` variable to avoid duplicate logging
-    for hook in hooks:
-        if isinstance(hook, monitors.MonitorHook):
-            hook._last = None  # Reset this to avoid duplicate printouts
+    return hooks
 
-    # Run the simulation with the hooks integrated in the `simulate_` function
-    result = simulate_(
-        graph,
-        model,
-        steps=steps,
-        mistrust=params.mistrust,
-        lowerupper=params.lowerupper,
-        upperlower=params.upperlower,
-        hooks=hooks  # Hooks will be executed inside `simulate_`, no need to call them manually
-    )
-    
-    # Unpack the results for clarity
+def log_result(idx, interval_label, steps, result):
+    """
+    Log the results of a simulation.
+    """
     steps_taken, duration, action, undefined, converged, polarized = result
-       
-     # Store the result
-    results.add(steps_taken, duration, action, undefined, converged, polarized)
-       
     log.info(
-           f"Interval {interval_label}: "
-           f"{steps} steps "
-           f"{duration:7.2f}s; "
-           f"action: {action} "
-           f"undefined: {undefined} "
-           f"converged: {converged} "
-           f"polarized: {polarized}"
-       )
+        f"Sim #{idx:04d} Interval {interval_label}: "
+        f"{steps_taken} steps "
+        f"{duration:7.2f}s; "
+        f"action: {action} "
+        f"undefined: {undefined} "
+        f"converged: {converged} "
+        f"polarized: {polarized}"
+    )
 
-    return results
 
 def simulate_(
     graph, model, steps=1, hooks=None, mistrust=0.0, lowerupper=0.5, upperlower=0.99
@@ -527,7 +497,6 @@ def consensus(graph, lowerupper=0.99):
         belief = graph.ndata["beliefs"]
         return "B" if torch.all(torch.gt(belief, lowerupper)) else "A"
     return "?"
-
 
 def converged(graph, upperlower=0.5, lowerupper=0.99):
     """

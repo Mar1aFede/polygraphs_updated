@@ -264,6 +264,7 @@ def simulate(params, op=None, **meta):
 
     # Check if the network is temporal
     interval = getattr(params, 'interval', None) if hasattr(params, 'interval') else None
+    adaptive = getattr(params, 'adaptive', False) if hasattr(params, 'adaptive') else False
     if interval:
         # Temporal graph (subgraph case)
         graph = graphs.create(params.network)
@@ -324,9 +325,35 @@ def simulate(params, op=None, **meta):
                 # Save node states for the next iteration
                 node_states = store_node_states(subgraph)
 
-    
-    else:
-        # Static graph case
+                print(f'Updated node states after simulation: {node_states}')
+            
+            # # Store final beliefs for this interval into the belief matrix
+            # final_beliefs = subgraph.ndata['beliefs'].cpu().numpy()  # Get beliefs as numpy array
+            # belief_matrix.append(final_beliefs)  # Append to the matrix
+    elif adaptive:
+        # Adaptive graph handling
+        graph = graphs.create(params.network)
+        node_states = initialize_beliefs(graph, params)
+        graph.ndata['beliefs'] = node_states  # Initialize 'states' attribute in graph.ndata
+        total_steps = params.simulation.steps
+
+        # # Ensure graph_update_fn is callable
+        # if graph_update_fn is not None and not callable(graph_update_fn):
+        #     raise ValueError("The provided graph_update_fn is not callable.")
+
+        # Create the adaptive operator with the provided adaptation rule
+        adaptive_op = ops.AdaptivePolyGraphOp(graph, params)
+
+        for step in range(total_steps):
+            if step%100==0:
+                print(f"Running adaptive simulation step {step + 1}/{total_steps}")
+                print('average/std opinion', np.mean(graph.ndata["beliefs"].cpu().numpy()), np.quantile(graph.ndata["beliefs"].cpu().numpy(), .25), np.quantile(graph.ndata["beliefs"].cpu().numpy(), .75))
+            adaptive_op.forward()  # Run the adaptive operator's forward method to update both beliefs and graph          
+           
+               
+    else: 
+        # Standard execution for static networks
+
         for idx in range(params.simulation.repeats):
             log.debug("Simulation #{:04d} starts".format(idx + 1))
             graph = graphs.create(params.network)

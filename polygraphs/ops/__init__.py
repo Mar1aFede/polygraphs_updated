@@ -31,6 +31,9 @@ from .complex import (
 
 from .weightedops import BalaGoyalWeighted2Op, BalaGoyalWeightedOp
 
+from .adaptive import AdaptivePolyGraphOp
+
+
 __all__ = [
     "PolyGraphOp",
     "BalaGoyalOp",
@@ -51,6 +54,7 @@ __all__ = [
     "UnreliableNetworkModifiedAlignedNegativeEpsOp",
     "BalaGoyalWeightedOp",
     "BalaGoyalWeighted2Op",
+    "AdaptivePolyGraphOp",
 ]
 
 

@@ -3,10 +3,10 @@
 Run PolyGraph simulation(s)
 """
 
-import polygraphs as pg
+import polygraphs_updated as pg
 
-from polygraphs import cli
-from polygraphs import hyperparameters as hp
+from polygraphs_updated import cli
+from polygraphs_updated import hyperparameters as hp
 
 def run():
     # Read command-line arguments

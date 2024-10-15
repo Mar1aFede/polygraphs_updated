@@ -16,7 +16,7 @@ setuptools.setup(
     url="https://github.com/Mar1aFede/polygraphs_updated",
     license="MIT",
     keywords="test test",
-    packages=['polygraphs_updated'],  # Reference the folder containing the Python code
+    packages=setuptools.find_packages(),  # Reference the folder containing the Python code
     install_requires=[
         "torch", "dgl", "notebook", "matplotlib", "pylint", "flake8", "PyYaml", "pandas", "h5py"
     ],

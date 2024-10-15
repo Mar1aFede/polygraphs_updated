@@ -31,6 +31,7 @@ log = logger.getlogger()
 
 # Cache data directory for all results
 _RESULTCACHE = os.getenv("POLYGRAPHS_CACHE") or "~/polygraphs-cache/results"
+print(f"Results directory: {params.simulation.results}")
 
 
 def _mkdir(directory="auto", attempts=10):

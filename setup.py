@@ -4,7 +4,7 @@ PolyGraph installation setup
 
 import setuptools
 
-VERSION = "1"
+VERSION = "2"
 
 setuptools.setup(
     name="polygraphs_updated",

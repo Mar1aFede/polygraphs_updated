@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "polygraphs"
+name = "polygraphs_updated"
 version = "0.0.21-alpha"
 authors = [
     {name="Alexandros Koliousis", email="ak@akoliousis.com"},
@@ -27,8 +27,8 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/alexandroskoliousis/polygraphs"
+Repository = "https://github.com//Mar1aFede/polygraphs_updated"
 Documentation = "https://akoliousis.com/polygraphs/"
 
 [project.scripts]
-polygraphs = "polygraphs.run:run"
+polygraphs_updated = "polygraphs_updated.run:run"

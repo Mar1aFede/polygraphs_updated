@@ -35,6 +35,7 @@ log = logger.getlogger()
 _RESULTCACHE = os.getenv("POLYGRAPHS_CACHE") or "~/polygraphs-cache/results/"
 
 
+
 def _mkdir(directory="auto", attempts=10):
     """
     Creates unique directory to store simulation results.
@@ -79,6 +80,7 @@ def _storeresult(params, result):
     assert os.path.isdir(params.simulation.results)
     # Export results
     result.store(params.simulation.results)
+    print(f"Results directory: {params.simulation.results}")
 
 
 def _storeparams(params, explorables=None):

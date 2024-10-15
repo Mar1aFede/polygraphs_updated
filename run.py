@@ -2,7 +2,7 @@
 Run PolyGraph simulation(s)
 """
 
-from polygraphs.run import run
+from polygraphs_updated.run import run
 
 
 if __name__ == "__main__":

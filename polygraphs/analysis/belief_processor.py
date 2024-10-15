@@ -4,45 +4,67 @@ import h5py  # Importing h5py library for working with HDF5 files
 
 class BeliefProcessor:
     def get_beliefs(self, hd5_file_path, bin_file_path, graph_converter):
-        # Retrieve graph object from bin file using the provided graph_converter
-        graph = graph_converter.get_graph_object(bin_file_path)
-	  # Check if the graph is empty or if it contains the necessary attributes
-        if graph is None or graph.number_of_nodes() == 0:
-            print(f"[ERROR] No nodes in graph from {bin_file_path}.")
-            return pd.DataFrame()  # Return an empty DataFrame if the graph is not valid
-        
-        # Convert the graph to a NetworkX graph
-        G = graph_converter.convert_graph_networkx(graph)
+        # Retrieve graph object(s) from bin file using the provided graph_converter
+        graph_list = graph_converter.get_graph_object(bin_file_path)
 
-        # Open the HDF5 file in read mode
-        with h5py.File(hd5_file_path, "r") as fp:
-            # Extract the keys (iteration numbers) from the 'beliefs' group in the HDF5 file
-            _keys = sorted(map(int, fp["beliefs"].keys()))
-            # Initialize a list to store iteration number and corresponding beliefs
-            iterations = [(0, graph[0].ndata["beliefs"].tolist())]
+        # Ensure we are dealing with a list (even if it's a single graph, treat uniformly)
+        if not isinstance(graph_list, list):
+            graph_list = [graph_list]  # Convert to a list if it's a single graph
 
-            # Iterate over each key (iteration number) in the HDF5 file
-            for key in _keys:
-                # Retrieve beliefs data for the current iteration
-                beliefs = fp["beliefs"][str(key)]
+        # Initialize a list to collect beliefs for all graphs (for temporal networks)
+        all_beliefs = []
 
-                # Append the iteration number and beliefs data to the list
-                iterations.append((key, list(beliefs)))
+        # Iterate over each graph in the list
+        for idx, graph in enumerate(graph_list):
+            # Check if the graph is valid
+            if graph is None or graph.number_of_nodes() == 0:
+                print(f"[ERROR] No nodes in graph from {bin_file_path}, interval: {idx}.")
+                continue  # Skip invalid graphs
 
-        # Create a MultiIndex for DataFrame indexing with iteration number and node as indices
-        index = pd.MultiIndex.from_product(
-            [[0, *_keys], list(G.nodes())], names=["iteration", "node"]
-        )
+            # Open the HDF5 file in read mode
+            with h5py.File(hd5_file_path, "r") as fp:
+                # Extract the keys (iteration numbers) from the 'beliefs' group in the HDF5 file
+                _keys = sorted(map(int, fp["beliefs"].keys()))
+                # Initialize a list to store iteration number and corresponding beliefs
+                initial_beliefs = graph.ndata["beliefs"].tolist()
+                iterations = [(0, initial_beliefs)]
 
-        # Create an empty DataFrame with the defined MultiIndex
-        iterations_df = pd.DataFrame(index=index, columns=["beliefs"], dtype="Float32")
+                # Iterate over each key (iteration number) in the HDF5 file
+                for key in _keys:
+                    # Retrieve beliefs data for the current iteration
+                    beliefs = fp["beliefs"][str(key)]
+                    # Append the iteration number and beliefs data to the list
+                    iterations.append((key, list(beliefs)))
 
-        # Populate the DataFrame with beliefs data for each iteration
-        for key, beliefs in iterations:
-            iterations_df.loc[key, "beliefs"] = beliefs
+            # Create a DataFrame for this graph without the "interval" column initially
+            data = []
+            for key, beliefs in iterations:
+                for node, belief in enumerate(beliefs):
+                    data.append((key, node, belief))  # Append step, node, belief
 
-        # Return the populated DataFrame containing beliefs data for each iteration
-        return iterations_df
+            # Convert the collected data into a DataFrame
+            iterations_df = pd.DataFrame(
+                data, columns=["step", "node", "beliefs"]
+            )
+
+            # Append the DataFrame for this graph to the overall beliefs list
+            all_beliefs.append(iterations_df)
+
+        # Concatenate all subgraph DataFrames along the first axis
+        if len(all_beliefs) > 0:
+            final_beliefs_df = pd.concat(all_beliefs, ignore_index=True)
+        else:
+            # If no valid graphs were processed, return an empty DataFrame
+            return pd.DataFrame()
+
+        # Set the updated index back to "step" and "node"
+        final_beliefs_df.set_index(["step", "node"], inplace=True)
+
+        # Return the final DataFrame containing beliefs data for all iterations and subgraphs
+        return final_beliefs_df
+
+
+
 
 
 class Beliefs:

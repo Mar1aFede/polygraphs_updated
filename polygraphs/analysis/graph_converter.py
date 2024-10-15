@@ -9,8 +9,8 @@ class GraphConverter:
         return graph
 
     def convert_graph_networkx(self, graph):
-        # Remove self-loops from the graph and convert it to a networkx Graph object
-        graph = dgl.remove_self_loop(graph[0])
+        # Remove self-loops from the graph and convert it to a NetworkX graph object
+        graph = dgl.remove_self_loop(graph)
         G = nx.Graph(dgl.to_networkx(graph))
         return G
 

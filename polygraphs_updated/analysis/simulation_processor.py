@@ -131,10 +131,10 @@ class SimulationProcessor:
 
         # Resolve path to config file using pathlib
         config_path = subfolder_path / "configuration.json"
-        print(f"Checking for config file at: {config_path}")  
+        #print(f"Checking for config file at: {config_path}")  
         # If no configuration file is found, skip processing this subfolder
-        if not config_path.exists():
-           print(f"No configuration file found at {config_path}.")
+        #if not config_path.exists():
+           #print(f"No configuration file found at {config_path}.")
            return 
        
         # Load the configuration JSON file

@@ -135,7 +135,7 @@ class SimulationProcessor:
         # If no configuration file is found, skip processing this subfolder
         #if not config_path.exists():
            #print(f"No configuration file found at {config_path}.")
-           return 
+        return 
        
         # Load the configuration JSON file
         config_data = self.load_config(config_path)

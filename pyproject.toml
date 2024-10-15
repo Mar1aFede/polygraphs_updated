@@ -27,8 +27,8 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/alexandroskoliousis/polygraphs"
+Repository = "https://github.com//Mar1aFede/polygraphs_updated"
 Documentation = "https://akoliousis.com/polygraphs/"
 
 [project.scripts]
-polygraphs = "polygraphs.run:run"
+polygraphs_updated = "polygraphs_updated.run:run"

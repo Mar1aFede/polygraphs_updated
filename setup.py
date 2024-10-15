@@ -16,11 +16,11 @@ setuptools.setup(
     url="https://github.com/Mar1aFede/polygraphs_updated",
     license="MIT",
     keywords="test test",
-    packages=['polygraphs'],  # Reference the folder containing the Python code
+    packages=['polygraphs_updated'],  # Reference the folder containing the Python code
     install_requires=[
         "torch", "dgl", "notebook", "matplotlib", "pylint", "flake8", "PyYaml", "pandas", "h5py"
     ],
     python_requires=">=3",
-    package_data={'polygraphs': ['logging.yaml']},
+    package_data={'polygraphs_updated': ['logging.yaml']},
     include_package_data=True,
 )

@@ -7,6 +7,8 @@ import datetime
 import random as rnd
 import collections
 import json
+from networkx.readwrite import json_graph
+import logging
 
 import dgl
 import torch
@@ -30,7 +32,7 @@ from .graphs import create_subgraphs
 log = logger.getlogger()
 
 # Cache data directory for all results
-_RESULTCACHE = os.getenv("POLYGRAPHS_CACHE") or "~/polygraphs-cache/results"
+_RESULTCACHE = os.getenv("POLYGRAPHS_CACHE") or "~/polygraphs-cache/results/"
 
 
 def _mkdir(directory="auto", attempts=10):
@@ -336,7 +338,18 @@ def simulate(params, op=None, **meta):
         node_states = initialize_beliefs(graph, params)
         graph.ndata['beliefs'] = node_states  # Initialize 'states' attribute in graph.ndata
         total_steps = params.simulation.steps
-
+        print('average/std opinion initial', np.mean(graph.ndata["beliefs"].cpu().numpy()), np.quantile(graph.ndata["beliefs"].cpu().numpy(), .25), np.quantile(graph.ndata["beliefs"].cpu().numpy(), .75))
+        if params.adaptive_logging == True:
+            M = params.adaptive_logging_interval 
+            if params.adaptive_logging_dir:
+                output_dir = params.adaptive_logging_dir
+                
+            else:
+                output_dir = _RESULTCACHE
+            _mkdir(output_dir);
+        
+        else:
+            M = None
         # # Ensure graph_update_fn is callable
         # if graph_update_fn is not None and not callable(graph_update_fn):
         #     raise ValueError("The provided graph_update_fn is not callable.")
@@ -345,9 +358,25 @@ def simulate(params, op=None, **meta):
         adaptive_op = ops.AdaptivePolyGraphOp(graph, params)
 
         for step in range(total_steps):
+            if M:
+                if step % M == 0:
+                    # Save the complete edgelist and node beliefs every M steps
+                    nx_graph = dgl.to_networkx(graph)  # Convert DGL graph to NetworkX graph
+                    output_edgelist = convert_to_native_types(json_graph.adjacency_data(nx_graph))  # Get adjacency data for JSON
+
+                    # Extracting the complete node beliefs array
+                    output_node_beliefs = graph.ndata['beliefs'].cpu().numpy()  # Get the full node beliefs array
+
+                    # Log or save the edgelist and node beliefs
+                    with open(output_dir+f"edgelist_step_{step}.json", "w") as edge_file:
+                        json.dump(output_edgelist, edge_file)
+                    np.save(output_dir+f"node_beliefs_step_{step}.npy", output_node_beliefs)
+                    # # Alternatively, log the full data if preferred (e.g., for debugging purposes)
+                    # logging.info(f"Step {step}: Edgelist saved to edgelist_step_{step}.json")
+                    # logging.info(f"Step {step}: Node beliefs saved to node_beliefs_step_{step}.npy")
             if step%100==0:
                 print(f"Running adaptive simulation step {step + 1}/{total_steps}")
-                print('average/std opinion', np.mean(graph.ndata["beliefs"].cpu().numpy()), np.quantile(graph.ndata["beliefs"].cpu().numpy(), .25), np.quantile(graph.ndata["beliefs"].cpu().numpy(), .75))
+                print('average/std opinion', np.mean(graph.ndata["beliefs"].cpu().numpy()), np.median(graph.ndata["beliefs"].cpu().numpy()), np.quantile(graph.ndata["beliefs"].cpu().numpy(), .25), np.quantile(graph.ndata["beliefs"].cpu().numpy(), .75))
             adaptive_op.forward()  # Run the adaptive operator's forward method to update both beliefs and graph          
            
                
@@ -413,6 +442,16 @@ def log_result(idx, interval_label, steps, result):
         f"polarized: {polarized}"
     )
 
+
+def convert_to_native_types(data):
+    if isinstance(data, dict):
+        return {convert_to_native_types(k): convert_to_native_types(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [convert_to_native_types(i) for i in data]
+    elif isinstance(data, (np.int64, np.int32, np.float64, np.float32)):
+        return data.item()
+    else:
+        return data
 
 def simulate_(
     graph, model, steps=1, hooks=None, mistrust=0.0, lowerupper=0.5, upperlower=0.99

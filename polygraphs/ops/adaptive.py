@@ -75,16 +75,22 @@ class AdaptivePolyGraphOp(torch.nn.Module):
         if activity_type == "gaussian":
             mean = activities_params.get('params', {}).get('mean', 0.5)
             std = activities_params.get('params', {}).get('std', 0.1)
-            return np.clip(np.random.normal(mean, std, size), 0, 1)
+            return np.random.normal(mean, std, size)
         elif activity_type == "exponential":
             scale = activities_params.get('params', {}).get('scale', 1.0)
-            return np.clip(np.random.exponential(scale, size), 0, 1)
+            return np.random.exponential(scale, size)
+        
         elif activity_type == "powerlaw":
-            powerlaw_alpha = activities_params.get('params', {}).get('powerlaw_alpha', 2.5)
-            return np.clip(np.random.pareto(powerlaw_alpha, size) + 1, 0, 1)
+            gamma_a = activities_params.get('params', {}).get('gamma_a', 2.1)
+            low_a = activities_params.get('params', {}).get('low_a', 0.01)
+            high_a = activities_params.get('params', {}).get('high_a', 1.0)
+            U = np.random.uniform(0., 1., size)
+            one_minus_gamma = (1. - gamma_a)
+            K_norm = one_minus_gamma / (high_a ** one_minus_gamma - low_a ** one_minus_gamma)
+            return (U * one_minus_gamma * K_norm ** -1 + low_a ** one_minus_gamma) ** (1. / one_minus_gamma)
         else:
             raise ValueError(f"Unknown activity initialization type: {activity_type}")
-
+        
 
     def forward(self):
         """

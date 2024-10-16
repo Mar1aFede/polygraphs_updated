@@ -64,9 +64,11 @@ def _mkdir(directory="auto", attempts=10):
         ), f"Failed to generate unique id after {attempts} attempts"
     else:
         # User-defined directory must not exist
-        assert not os.path.isdir(directory), "Results directory already exists"
+        if not os.path.isdir(directory):
+            print("Results directory already exists")
+        else:
+            os.makedirs(directory);
     # Create result directory, or raise an exception if it already exists
-    os.makedirs(directory)
     return uid, directory
 
 
@@ -345,7 +347,6 @@ def simulate(params, op=None, **meta):
             M = params.adaptive_logging_interval 
             if params.adaptive_logging_dir:
                 output_dir = params.adaptive_logging_dir
-                
             else:
                 output_dir = _RESULTCACHE
             _mkdir(output_dir);

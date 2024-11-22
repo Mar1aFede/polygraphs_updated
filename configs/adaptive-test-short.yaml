@@ -6,7 +6,7 @@ adaptive: true
 network:
   kind: random
   type: erdos_renyi
-  size: 2500
+  size: 100
   random:
     probability: 0.1
     tries: 10
@@ -15,11 +15,12 @@ network:
   selfloop: false
 
 simulation:
-  steps: 2000
+  steps: 100
   repeats: 1
   adaptive: true
   logging: true
   logging_interval: 1
+  results: "/content/gdrive/MyDrive/Bootcamp-results/adaptive-results/test/"
 
 device: cpu
 init:
@@ -39,7 +40,7 @@ adaptation_params:
 
 adaptive_logging: true
 adaptive_logging_interval: 1 
-adaptive_logging_dir: "~/polygraphs-cache/adaptive-results/radicalicalization/"
+adaptive_logging_dir: /content/gdrive/MyDrive/Bootcamp-results/adaptive-results/test/"
 
 # Activities section added here
 # activities:

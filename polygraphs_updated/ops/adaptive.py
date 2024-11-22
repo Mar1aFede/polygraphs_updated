@@ -161,7 +161,7 @@ class BeliefUpdateRuleSigmaAD(torch.nn.Module):
         graph.ndata["beliefs"] = new_beliefs
 
 
-def _homophily_based_AD(graph, gamma=2.0, m=10, activities=None, epsilon=1e-2):
+def _homophily_based_AD(graph, gamma=2.0, m=10, activities=None, epsilon=1e-6):
     """
     Custom adaptation rule inspired by Starnini and Baumann's work on homophily and polarization.
     This rule aims to adapt the network structure by adding/removing edges based on homophily dynamics.

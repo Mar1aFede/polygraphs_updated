@@ -40,37 +40,49 @@ def _mkdir(directory="auto", attempts=10):
     """
     Creates unique directory to store simulation results.
     """
+    print(f"Requested directory: {directory}")  # Debug print
+
     # Unique exploration or simulation id
     uid = None
     if not directory:
-        # Do nothing
+        print("No directory provided. Skipping creation.")  # Debug print
         return uid, directory
     head, tail = os.path.split(directory)
+    print(f"Head: {head}, Tail: {tail}")  # Debug print
+
     if tail == "auto":
         # If the parent is set, do not create subdirectory for today
         date = datetime.date.today().strftime("%Y-%m-%d") if not head else ""
         head = head or _RESULTCACHE
+        print(f"Using head: {head}")  # Debug print
         for attempt in range(attempts):
             # Generate unique id string
             uid = uuid.uuid4().hex
             # Generate unique directory
             directory = os.path.join(os.path.expanduser(head), date, uid)
+            print(f"Attempt {attempt + 1}: Trying to create {directory}")  # Debug print
             # Likely
             if not os.path.isdir(directory):
-                break
+                try:
+                    os.makedirs(directory)
+                    print(f"Directory created: {directory}")  # Debug print
+                    break
+                except Exception as e:
+                    print(f"Failed to create directory: {e}")  # Debug print
         # Unlikely error
         assert (
             attempt + 1 < attempts
         ), f"Failed to generate unique id after {attempts} attempts"
     else:
         # User-defined directory must not exist
+        print(f"Checking user-defined directory: {directory}")  # Debug print
         if os.path.isdir(directory):
             print("Results directory already exists")
         else:
-            os.makedirs(directory);
-    # Create result directory, or raise an exception if it already exists
+            os.makedirs(directory)
+            print(f"Created directory: {directory}")
+    # Return the unique ID and directory path
     return uid, directory
-
 
 def _storeresult(params, result):
     """

@@ -264,7 +264,7 @@ def simulate(params, op=None, **meta):
         params.op = op.__name__
 
     # Create result directory
-    uid, params.simulation.results = _mkdir(params.simulation.results)
+    uid, params.simulation.results = _mkdir(directory="auto")
     _storeparams(params)
     results = metadata.PolyGraphSimulation(uid=uid, **meta)
 
